@@ -1,0 +1,5 @@
+whisper_models/
+models/
+benv/
+__pycache__/
+*.whl
