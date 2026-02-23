@@ -1,0 +1,5 @@
+faster-whisper
+sounddevice
+numpy
+sentence-transformers
+huggingface_hub
