@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Bible STT — Control</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'JetBrains Mono', monospace; background: #0a0a0a; }
+    .bebas { font-family: 'Bebas Neue', sans-serif; }
+    .glow { box-shadow: 0 0 20px rgba(250,204,21,0.4); }
+    .glow-red { box-shadow: 0 0 20px rgba(239,68,68,0.4); }
+    .pulse-dot { animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+    #log-box { scrollbar-width: thin; scrollbar-color: #333 #0a0a0a; }
+    .meter-fill { transition: width 0.1s ease; }
+    .verse-flash { animation: flash 0.4s ease; }
+    @keyframes flash {
+      0% { background: rgba(250,204,21,0.2); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-white p-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="bebas text-5xl text-yellow-400 tracking-widest">LIVE BIBLE STT</h1>
+      <p class="text-zinc-500 text-xs tracking-widest uppercase mt-1">Real-time Scripture Detection</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="status-dot" class="w-3 h-3 rounded-full bg-zinc-600"></span>
+      <span id="status-label" class="text-zinc-400 text-sm tracking-wider uppercase">Offline</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- LEFT: Controls + Verse Display -->
+    <div class="lg:col-span-2 flex flex-col gap-6">
+
+      <!-- Control Buttons -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button id="btn-start"
+          class="bebas text-2xl tracking-widest py-4 rounded-none border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black transition-all duration-150 glow"
+          onclick="socket.emit('start')">
+          ▶ START
+        </button>
+        <button id="btn-stop"
+          class="bebas text-2xl tracking-widest py-4 rounded-none border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-black transition-all duration-150 glow-red"
+          onclick="socket.emit('stop')">
+          ⏹ STOP
+        </button>
+        <button
+          class="bebas text-2xl tracking-widest py-4 rounded-none border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-150"
+          onclick="socket.emit('next')">
+          ⏭ NEXT
+        </button>
+        <button
+          class="bebas text-2xl tracking-widest py-4 rounded-none border-2 border-zinc-600 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-all duration-150"
+          onclick="socket.emit('clear')">
+          ✕ CLEAR
+        </button>
+      </div>
+
+      <!-- Audio Meters -->
+      <div class="border border-zinc-800 p-4 bg-zinc-950">
+        <p class="text-zinc-500 text-xs tracking-widest uppercase mb-3">Audio Input</p>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-3">
+            <span class="text-zinc-600 text-xs w-8">RMS</span>
+            <div class="flex-1 bg-zinc-900 h-2">
+              <div id="rms-bar" class="meter-fill h-full bg-yellow-400" style="width:0%"></div>
+            </div>
+            <span id="rms-val" class="text-zinc-500 text-xs w-14 text-right">0.00000</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-zinc-600 text-xs w-8">PEAK</span>
+            <div class="flex-1 bg-zinc-900 h-2">
+              <div id="peak-bar" class="meter-fill h-full bg-white" style="width:0%"></div>
+            </div>
+            <span id="peak-val" class="text-zinc-500 text-xs w-14 text-right">0.00000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Verse Display -->
+      <div id="verse-panel" class="border-2 border-yellow-400 p-6 bg-zinc-950 min-h-48 glow">
+        <p class="text-zinc-600 text-xs tracking-widest uppercase mb-4">Now Displaying</p>
+        <div id="verse-title" class="bebas text-3xl text-yellow-400 tracking-widest mb-3">—</div>
+        <div id="verse-body" class="text-white text-sm leading-relaxed"></div>
+      </div>
+
+      <!-- Last Transcript -->
+      <div class="border border-zinc-800 p-4 bg-zinc-950">
+        <p class="text-zinc-500 text-xs tracking-widest uppercase mb-2">Last Heard</p>
+        <p id="transcript" class="text-zinc-300 text-sm italic">Waiting for speech...</p>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Activity Log -->
+    <div class="flex flex-col border border-zinc-800 bg-zinc-950">
+      <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+        <span class="text-zinc-500 text-xs tracking-widest uppercase">Activity Log</span>
+        <span id="pulse" class="hidden pulse-dot w-2 h-2 rounded-full bg-yellow-400"></span>
+      </div>
+      <div id="log-box" class="flex-1 overflow-y-auto p-4 flex flex-col gap-1 max-h-[600px]">
+        <p class="text-zinc-700 text-xs">Waiting for connection...</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const socket = io();
+
+    socket.on("connect", () => {
+      addLog("✅ Connected to server");
+    });
+
+    socket.on("disconnect", () => {
+      addLog("❌ Disconnected");
+      setStatus(false);
+    });
+
+    socket.on("status", (data) => {
+      setStatus(data.running);
+    });
+
+    socket.on("log", (data) => {
+      addLog(data.message);
+    });
+
+    socket.on("transcript", (data) => {
+      document.getElementById("transcript").textContent = data.text;
+    });
+
+    socket.on("levels", (data) => {
+      const rmsW = Math.min(data.rms * 800, 100);
+      const peakW = Math.min(data.peak * 300, 100);
+      document.getElementById("rms-bar").style.width = rmsW + "%";
+      document.getElementById("peak-bar").style.width = peakW + "%";
+      document.getElementById("rms-val").textContent = data.rms.toFixed(5);
+      document.getElementById("peak-val").textContent = data.peak.toFixed(5);
+    });
+
+    socket.on("verse", (data) => {
+      const panel = document.getElementById("verse-panel");
+      document.getElementById("verse-title").textContent = data.title || "—";
+      document.getElementById("verse-body").textContent = data.body || "";
+      if (data.title) {
+        panel.classList.add("verse-flash");
+        setTimeout(() => panel.classList.remove("verse-flash"), 400);
+      }
+    });
+
+    function setStatus(running) {
+      const dot = document.getElementById("status-dot");
+      const label = document.getElementById("status-label");
+      const pulse = document.getElementById("pulse");
+      if (running) {
+        dot.className = "w-3 h-3 rounded-full bg-yellow-400 pulse-dot";
+        label.textContent = "Live";
+        label.className = "text-yellow-400 text-sm tracking-wider uppercase";
+        pulse.classList.remove("hidden");
+      } else {
+        dot.className = "w-3 h-3 rounded-full bg-zinc-600";
+        label.textContent = "Offline";
+        label.className = "text-zinc-400 text-sm tracking-wider uppercase";
+        pulse.classList.add("hidden");
+      }
+    }
+
+    function addLog(msg) {
+      const box = document.getElementById("log-box");
+      const line = document.createElement("p");
+      const time = new Date().toLocaleTimeString("en-US", {hour12: false});
+
+      // Color coding
+      if (msg.startsWith("📖")) line.className = "text-yellow-400 text-xs";
+      else if (msg.startsWith("🎤")) line.className = "text-zinc-300 text-xs";
+      else if (msg.startsWith("⚠️")) line.className = "text-orange-400 text-xs";
+      else if (msg.startsWith("❌")) line.className = "text-red-400 text-xs";
+      else if (msg.startsWith("✅") || msg.startsWith("▶️")) line.className = "text-green-400 text-xs";
+      else line.className = "text-zinc-500 text-xs";
+
+      line.textContent = `[${time}] ${msg}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+  </script>
+</body>
+</html>

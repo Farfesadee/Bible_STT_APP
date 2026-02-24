@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      padding: 60px;
+    }
+    #verse-container {
+      width: 100%;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    #verse-container.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #verse-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.2em;
+      color: #facc15;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+    }
+    #verse-bar {
+      width: 60px;
+      height: 3px;
+      background: #facc15;
+      margin-bottom: 14px;
+    }
+    #verse-body {
+      font-family: 'Crimson Pro', serif;
+      font-size: 36px;
+      line-height: 1.5;
+      color: #ffffff;
+      text-shadow: 0 2px 16px rgba(0,0,0,0.9);
+      max-width: 900px;
+      background: linear-gradient(135deg, rgba(0,0,0,0.75), rgba(0,0,0,0.5));
+      padding: 24px 32px;
+      border-left: 4px solid #facc15;
+    }
+  </style>
+</head>
+<body>
+  <div id="verse-container">
+    <div id="verse-title"></div>
+    <div id="verse-bar"></div>
+    <div id="verse-body"></div>
+  </div>
+
+  <script>
+    const socket = io();
+    const container = document.getElementById("verse-container");
+    let hideTimer = null;
+
+    socket.on("verse", (data) => {
+      clearTimeout(hideTimer);
+
+      if (!data.title) {
+        container.classList.remove("visible");
+        return;
+      }
+
+      document.getElementById("verse-title").textContent = data.title;
+      document.getElementById("verse-body").textContent = data.body;
+      container.classList.add("visible");
+
+      // Auto-hide after 12 seconds
+      hideTimer = setTimeout(() => {
+        container.classList.remove("visible");
+      }, 12000);
+    });
+  </script>
+</body>
+</html>

@@ -9,8 +9,8 @@ from sentence_transformers import SentenceTransformer
 
 EMBEDDING_MODEL_PATH = "models/all-MiniLM-L6-v2"
 TOP_K = 5
-CONFIDENCE_MIN_SCORE = 0.68
-CONFIDENCE_MARGIN = 0.12
+CONFIDENCE_MIN_SCORE = 0.58
+CONFIDENCE_MARGIN = 0.06
 MAX_SCORE_CLAMP = 1.25
 
 # --------------------------------------
