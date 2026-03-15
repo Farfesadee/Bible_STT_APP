@@ -20,13 +20,13 @@ MIC_SAMPLE_RATE = 16000
 RESET_AFTER_SECONDS = 20       # Raised — prevents same verse refiring too quickly
 ANTICIPATION_TIMEOUT = 3
 MODEL_PATH = "whisper_models/faster-whisper-small"
-CHUNK_SECONDS = 4
-OVERLAP_SECONDS = 0.2
+CHUNK_SECONDS = 2
+OVERLAP_SECONDS = 0.1
 MIN_RMS = 0.004
 MIN_PEAK = 0.01
 MIN_TEXT_CHARS = 6
 MIN_WORDS = 2
-MIN_SEARCH_WORDS = 3
+MIN_SEARCH_WORDS = 5
 MAX_VERSES_ON_SCREEN = 4
 MAX_TRANSCRIPT_CHARS = 300     # Reject absurdly long hallucinated strings
 
@@ -220,11 +220,29 @@ def stt_loop():
                 continue
 
             # ---------- SEARCH ----------
+            # ---------- SEARCH ----------
             if len(norm.split()) < MIN_SEARCH_WORDS:
                 continue
 
+            # Require at least one Bible-related signal word
+            # before attempting semantic search — reduces false matches
+            # from general church conversation
+            BIBLE_SIGNAL_WORDS = [
+                "lord", "god", "jesus", "christ", "holy", "spirit",
+                "scripture", "bible", "verse", "written", "psalm",
+                "proverbs", "gospel", "faith", "prayer", "blessed",
+                "heaven", "salvation", "grace", "mercy", "glory",
+                "amen", "righteous", "eternal", "kingdom", "lamb",
+                "prophet", "covenant", "commandment", "worship",
+                "praise", "sin", "forgive", "redeem", "sanctify",
+            ]
+
+            has_signal = any(word in norm for word in BIBLE_SIGNAL_WORDS)
+            if not has_signal:
+                continue
+
             results = search_bible(norm, book_hint=state["current_book_context"])
-            if is_confident_match(results, threshold=0.58):
+            if is_confident_match(results, threshold=0.72):
                 v = results[0]
                 verse_key = (v["book"], v["chapter"], v["verse"])
 
@@ -245,8 +263,6 @@ def stt_loop():
             else:
                 if results:
                     log(f"⚠️ No match — Top: {results[0]['book']} {results[0]['chapter']}:{results[0]['verse']} ({results[0]['score']:.2f})")
-
-    log("⏹️ STT stopped.")
 
 # ================= SOCKET EVENTS =================
 
